@@ -38,7 +38,8 @@ int main()
 	camera.rotation = 0.0f;
 	camera.zoom = 1.0f;
 
-	string hoveredRegion = "";
+	Province hoveredProvince;
+	string provinceInfo = "";
 
 	while (!WindowShouldClose())
 	{
@@ -62,14 +63,25 @@ int main()
 		}
 
 		// Get hovered region
-		if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
+		if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) 
+		{
 			Vector2 mousePos = GetMousePosition();
 			Vector2 worldPos = {
 				(mousePos.x - camera.offset.x) / camera.zoom + camera.target.x,
 				(mousePos.y - camera.offset.y) / camera.zoom + camera.target.y
 			};
 
-			hoveredRegion = mapEngine.getProvinceAt((int)worldPos.x, (int)worldPos.y);
+			hoveredProvince = mapEngine.getProvinceAt((int)worldPos.x, (int)worldPos.y);
+			if (hoveredProvince.id != "") {
+				provinceInfo = "Region ID: " + hoveredProvince.id + " | Name: " + hoveredProvince.name;
+			}
+
+			// If CTRL is held
+			if (IsKeyDown(KEY_LEFT_CONTROL) || IsKeyDown(KEY_RIGHT_CONTROL)) 
+			{
+				mapEngine.setProvinceColor(hoveredProvince.id, RED);
+			}
+
         }
 
 
@@ -87,8 +99,8 @@ int main()
 		DrawText("Left Click: Get region info", 10, 55, 16, LIGHTGRAY);
 
 		// Show hovered region info
-        if (!hoveredRegion.empty()) {
-            DrawText(hoveredRegion.c_str(), 10, screenHeight - 30, 16, YELLOW);
+        if (!provinceInfo.empty()) {
+            DrawText(provinceInfo.c_str(), 10, screenHeight - 30, 16, YELLOW);
         }
 
 		EndDrawing();

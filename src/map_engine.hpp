@@ -20,6 +20,7 @@ struct Province
 	string name_en;
 	string name_local;
 	Color color;
+	int admin_level;
 
 	vector<vector<Vector2>> polygons;
 	vector<vector<uint32_t>> polygon_indices;
@@ -164,13 +165,17 @@ class MapEngine
 					//cout << "Doing NUTS level check..." << endl;
 
 					// NUTS level (check if exists first aka not null)
+					province.admin_level = properties.value("admin_level", 0);
 					province.nuts_level = properties.value("nuts_level", "");
 
 
-					if(province.nuts_level != "3" && province.nuts_level != "0")
+					if(province.admin_level < 4)
 					{
-						cout << "Skipping province " << properties.value("region_id", "") << " due to NUTS level " << province.nuts_level << endl;
-						continue; // Skip non-NUTS 3 regions
+						if((province.nuts_level == "3" && province.nuts_level == "0")) {}
+						else
+						{
+							continue; // Skip non-NUTS 3 regions
+						}
 					}
 
 					//cout << "NUTS level check passed, loading province ID..." << endl;
@@ -199,14 +204,12 @@ class MapEngine
 					for (char c : province.id) hash += c;
 
 					// Pastel colors
-					/*province.color = {
+					province.color = {
 						(unsigned char)(200 + (hash % 55)),
 						(unsigned char)(200 + ((hash * 17) % 55)),
 						(unsigned char)(200 + ((hash * 31) % 55)),
 						200
-					};*/
-
-					province.color = Color{ (unsigned char)(hash % 156 + 100), (unsigned char)(hash % 156 + 100), (unsigned char)(hash % 156 + 100), 255 };
+					};
 
 					//cout << "Loading geometry..." << endl;
 
@@ -367,7 +370,7 @@ class MapEngine
 			DrawRectangle(100, 100, 200, 100, RED);
 			DrawText("Test render", 110, 130, 20, WHITE);
 
-			DrawTriangle( (Vector2){100,100}, (Vector2){150,200}, (Vector2){200,100}, RED );
+			DrawTriangle( (Vector2){100,100}, (Vector2){150,200}, (Vector2){200,100}, GREEN );
 
 			for(const auto& province : provinces)
 			{
@@ -412,7 +415,7 @@ class MapEngine
 							if(indexA >= poly.size() || indexB >= poly.size() || indexC >= poly.size()) continue;
 
 							DrawTriangle(poly[indexA], poly[indexC], poly[indexB], fill_color);
-							DrawTriangleLines(poly[indexA], poly[indexB], poly[indexC], edge_color);
+							//DrawTriangleLines(poly[indexA], poly[indexB], poly[indexC], edge_color);
 						}
 					}
 					else
@@ -427,7 +430,7 @@ class MapEngine
 			}
 		}
 
-		string getProvinceAt(int x, int y)
+		Province getProvinceAt(int x, int y)
 		{
 			Vector2 point = {(float)x, (float)y};
 
@@ -445,12 +448,36 @@ class MapEngine
 						}
 					}
 					if (inside) {
-						return province.id + ": " + province.name;
+						return province;
 					}
 				}
 			}
 
-			return "";
+			return Province{};
 		}
 
+		void setProvinceColor(const string& id, const Color& color)
+		{
+			for(auto& province : provinces)
+			{
+				if(province.id == id)
+				{
+					province.color = color;
+					return;
+				}
+			}
+		}
+
+		Province getProvinceByID(const string& id)
+		{
+			for(const auto& province : provinces)
+			{
+				if(province.id == id)
+				{
+					return province;
+				}
+			}
+
+			return Province{};
+		}
 };
