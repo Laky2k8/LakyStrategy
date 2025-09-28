@@ -8,6 +8,8 @@
 
 #define MAPENGINE_ERR "LakyStrategy::MapEngine::Error: "
 
+static constexpr double EARTH_RADIUS = 6378137.0; // WGS84 Earth radius in meters
+
 using json = nlohmann::json;
 
 using namespace std;
@@ -44,13 +46,79 @@ class MapEngine
 
 		int screen_width, screen_height;
 
-		Vector2 geo_to_screen(double lat, double lon)
+		// Convert lat/lon to Web Mercator coordinates (EPSG:3857)
+		pair<double, double> latlon_to_mercator(double lat, double lon)
+		{
+			double x = lon * PI / 180.0 * EARTH_RADIUS;
+			double y = log(tan((90.0 + lat) * PI / 360.0)) * EARTH_RADIUS;
+			return {x, y};
+		}
+
+		// Old geo to screen
+		/*Vector2 geo_to_screen(double lat, double lon)
 		{
 			Vector2 screen;
 			screen.x = (lon - min_lon) / (max_lon - min_lon) * screen_width;
 			screen.y = screen_height - (lat - min_lat) / (max_lat - min_lat) * screen_height;
 			return screen;
+		}*/
+
+		Vector2 geo_to_screen(double lat, double lon)
+		{
+			// Calculate the aspect ratio of the geographic bounds
+			double geo_width = max_lon - min_lon;
+			double geo_height = max_lat - min_lat;
+			
+			// Approximate latitude correction (cos of center latitude)
+			double center_lat = (max_lat + min_lat) / 2.0;
+			double lat_correction = cos(center_lat * PI / 180.0);
+			double corrected_geo_width = geo_width * lat_correction;
+			
+			// Calculate aspect ratios
+			double geo_aspect = corrected_geo_width / geo_height;
+			double screen_aspect = (double)screen_width / screen_height;
+			
+			Vector2 screen;
+			
+			if (geo_aspect > screen_aspect)
+			{
+				// Geographic data is wider, fit to width
+				screen.x = (lon - min_lon) / geo_width * screen_width;
+				
+				double used_height = screen_width / geo_aspect;
+				double y_offset = (screen_height - used_height) / 2.0;
+				screen.y = y_offset + (max_lat - lat) / geo_height * used_height;
+			} 
+			else 
+			{
+				// Geographic data is taller, fit to height  
+				double used_width = screen_height * geo_aspect;
+				double x_offset = (screen_width - used_width) / 2.0;
+				screen.x = x_offset + (lon - min_lon) / geo_width * used_width;
+				
+				screen.y = (max_lat - lat) / geo_height * screen_height;
+			}
+			
+			return screen;
 		}
+
+		/*Vector2 geo_to_screen(double lat, double lon)
+		{
+			// Convert to Web Mercator first
+			double merc_x, merc_y;
+			tie(merc_x, merc_y) = latlon_to_mercator(lat, lon);
+			
+			// Calculate bounds in Mercator coordinates
+			double min_merc_x, max_merc_x, min_merc_y, max_merc_y;
+			tie(min_merc_x, min_merc_y) = latlon_to_mercator(min_lat, min_lon);
+			tie(max_merc_x, max_merc_y) = latlon_to_mercator(max_lat, max_lon);
+			
+			Vector2 screen;
+			screen.x = (merc_x - min_merc_x) / (max_merc_x - min_merc_x) * screen_width;
+			screen.y = screen_height - (merc_y - min_merc_y) / (max_merc_y - min_merc_y) * screen_height;
+			
+			return screen;
+		}*/
 
 	public:
 		MapEngine(int screen_w = 1280, int screen_h = 720) : screen_width(screen_w), screen_height(screen_h)
@@ -367,10 +435,10 @@ class MapEngine
 		void render()
 		{
 
-			DrawRectangle(100, 100, 200, 100, RED);
+			/*DrawRectangle(100, 100, 200, 100, RED);
 			DrawText("Test render", 110, 130, 20, WHITE);
 
-			DrawTriangle( (Vector2){100,100}, (Vector2){150,200}, (Vector2){200,100}, GREEN );
+			DrawTriangle( (Vector2){100,100}, (Vector2){150,200}, (Vector2){200,100}, GREEN );*/
 
 			for(const auto& province : provinces)
 			{
@@ -426,6 +494,27 @@ class MapEngine
 							DrawLineV(poly[k], poly[(k+1) % poly.size()], edge_color);
 						}
 					}
+				}
+			}
+		}
+
+		void render_outline()
+		{
+			const Color edge_color = DARKGRAY;
+
+			for (const auto& province : provinces) {
+				for (const auto& polygon : province.polygons) {
+					if (polygon.size() < 3) continue;
+					
+					// Draw filled polygon (simplified - just drawing outline for performance)
+					for (size_t i = 0; i < polygon.size() - 1; i++) {
+						DrawLineV(polygon[i], polygon[i + 1], DARKGRAY);
+					}
+					// Close the polygon
+					if (polygon.size() > 2) {
+						DrawLineV(polygon.back(), polygon[0], DARKGRAY);
+					}
+
 				}
 			}
 		}

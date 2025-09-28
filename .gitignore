@@ -45,6 +45,7 @@ include
 lib
 .vscode
 .devlog
+.build
 src/old
 src/imgui
 map_conversion

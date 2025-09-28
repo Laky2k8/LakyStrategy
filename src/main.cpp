@@ -3,7 +3,7 @@
 #include "map_engine.hpp"
 
 #define TITLE "LakyStrategy"
-#define VERSION_NUM "0.0.1"
+#define VERSION_NUM "0.1.0"
 #define LAKYSTRATEGY_ERROR "LakyStrategy::Error: "
 
 int main() 
@@ -92,11 +92,17 @@ int main()
 
         mapEngine.render();
 
+		if(camera.zoom > 5.0f)
+		{
+			mapEngine.render_outline();
+		}
+
 		EndMode2D();
 
-		DrawText(("NUTS 3 Regions: " + to_string(mapEngine.getProvinces().size())).c_str(), 10, 10, 20, WHITE);
+		DrawText(("Provinces: " + to_string(mapEngine.getProvinces().size())).c_str(), 10, 10, 20, WHITE);
         DrawText("Use mouse to explore", 10, 35, 16, LIGHTGRAY);
-		DrawText("Left Click: Get region info", 10, 55, 16, LIGHTGRAY);
+		DrawText("Left Click: Get province info", 10, 55, 16, LIGHTGRAY);
+		DrawText("Control + Left Click: Paint province", 10, 75, 16, LIGHTGRAY);
 
 		// Show hovered region info
         if (!provinceInfo.empty()) {
