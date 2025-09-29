@@ -1,4 +1,5 @@
 #include "raylib.h"
+#include "rlgl.h"
 #include "json.hpp"
 #include "earcut.hpp"
 #include <vector>
@@ -26,6 +27,7 @@ struct Province
 
 	vector<vector<Vector2>> polygons;
 	vector<vector<uint32_t>> polygon_indices;
+	vector<Rectangle> polygon_bounds;
 
 	// NUTS data
 	string country_code;
@@ -157,10 +159,16 @@ class MapEngine
 					if(properties.is_null()) continue;
 					
 					string nuts_level = properties.value("nuts_level", "");
-					if(nuts_level != "3" && nuts_level != "0") 
+					int admin_level = properties.value("admin_level", 0);
+					if(admin_level < 4)
 					{
-						continue;
+						if((nuts_level == "3" && nuts_level == "0")) {}
+						else
+						{
+							continue; // Skip non-NUTS 3 regions
+						}
 					}
+
 
 					// Print feature being processed
 					cout << "Calculating bounds for province " << feature["properties"].value("region_id", "") << endl;
@@ -416,6 +424,8 @@ class MapEngine
 
 				cout << "Sucessfully loaded " << provinces.size() << " provinces!" << endl;
 
+				calculatePolygonBounds();
+
 				return true;
 				
 
@@ -432,7 +442,57 @@ class MapEngine
 
 		const vector<Province>& getProvinces() const { return provinces; }
 
-		void render()
+		void calculatePolygonBounds()
+		{
+			for(auto& province : provinces)
+			{
+				province.polygon_bounds.clear();
+				
+				for(const auto& poly : province.polygons)
+				{
+					if(poly.empty()) continue;
+					
+					Rectangle bounds = {poly[0].x, poly[0].y, 0, 0};
+					float minX = poly[0].x, minY = poly[0].y;
+					float maxX = poly[0].x, maxY = poly[0].y;
+					
+					for(const auto& p : poly)
+					{
+						minX = min(minX, p.x);
+						minY = min(minY, p.y);
+						maxX = max(maxX, p.x);
+						maxY = max(maxY, p.y);
+					}
+					
+					bounds.x = minX;
+					bounds.y = minY;
+					bounds.width = maxX - minX;
+					bounds.height = maxY - minY;
+					
+					province.polygon_bounds.push_back(bounds);
+				}
+			}
+		}
+
+		bool isVisibleInCamera(const Rectangle& bounds, const Camera2D& camera, int screenWidth, int screenHeight)
+		{
+			// Get the world coordinates of the screen corners
+			Vector2 topLeft = GetScreenToWorld2D({0, 0}, camera);
+			Vector2 bottomRight = GetScreenToWorld2D({(float)screenWidth, (float)screenHeight}, camera);
+			
+			// Create a rectangle representing the visible world space
+			Rectangle viewRect = {
+				topLeft.x,
+				topLeft.y,
+				bottomRight.x - topLeft.x,
+				bottomRight.y - topLeft.y
+			};
+			
+			// Check if polygon bounds intersect with view rectangle
+			return CheckCollisionRecs(bounds, viewRect);
+		}
+
+		void render_old()
 		{
 
 			/*DrawRectangle(100, 100, 200, 100, RED);
@@ -498,15 +558,65 @@ class MapEngine
 			}
 		}
 
-		void render_outline()
+		void render(Camera2D camera) {
+			rlBegin(RL_TRIANGLES);
+			
+			for(const auto& province : provinces) {
+				rlColor4ub(province.color.r, province.color.g, province.color.b, province.color.a);
+				
+				for(size_t poly_index = 0; poly_index < province.polygons.size(); ++poly_index) {
+					const auto& poly = province.polygons[poly_index];
+					const auto& indices = province.polygon_indices[poly_index];
+
+					if(poly_index < province.polygon_bounds.size())
+					{
+						if(!isVisibleInCamera(province.polygon_bounds[poly_index], camera, screen_width, screen_height))
+						{
+							continue; 
+						}
+					}
+					else
+					{
+						continue;
+					}
+					
+					for(size_t i = 0; i + 2 < indices.size(); i += 3) {
+						uint32_t idxA = indices[i], idxB = indices[i+1], idxC = indices[i+2];
+						if(idxA >= poly.size() || idxB >= poly.size() || idxC >= poly.size()) continue;
+						
+						rlVertex2f(poly[idxA].x, poly[idxA].y);
+						rlVertex2f(poly[idxC].x, poly[idxC].y);
+						rlVertex2f(poly[idxB].x, poly[idxB].y);
+					}
+				}
+			}
+			
+			rlEnd();
+		}
+
+		void render_outline(Camera2D camera)
 		{
 			const Color edge_color = DARKGRAY;
 
 			for (const auto& province : provinces) {
-				for (const auto& polygon : province.polygons) {
+				for (size_t poly_index = 0; poly_index < province.polygons.size(); ++poly_index)
+				{
+					const auto& polygon = province.polygons[poly_index];
 					if (polygon.size() < 3) continue;
+
+					if(poly_index < province.polygon_bounds.size())
+					{
+						if(!isVisibleInCamera(province.polygon_bounds[poly_index], camera, screen_width, screen_height))
+						{
+							continue; 
+						}
+					}
+					else
+					{
+						continue;
+					}
 					
-					// Draw filled polygon (simplified - just drawing outline for performance)
+					// Draw outline
 					for (size_t i = 0; i < polygon.size() - 1; i++) {
 						DrawLineV(polygon[i], polygon[i + 1], DARKGRAY);
 					}

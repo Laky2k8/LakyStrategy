@@ -3,7 +3,7 @@
 #include "map_engine.hpp"
 
 #define TITLE "LakyStrategy"
-#define VERSION_NUM "0.1.0"
+#define VERSION_NUM "0.1.1"
 #define LAKYSTRATEGY_ERROR "LakyStrategy::Error: "
 
 int main() 
@@ -90,11 +90,11 @@ int main()
 
 		BeginMode2D(camera);
 
-        mapEngine.render();
+        mapEngine.render(camera);
 
 		if(camera.zoom > 5.0f)
 		{
-			mapEngine.render_outline();
+			mapEngine.render_outline(camera);
 		}
 
 		EndMode2D();
